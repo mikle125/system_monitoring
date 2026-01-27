@@ -69,6 +69,21 @@ class WebRTCYOLOAnnotator:
         self.screenshots_dir = Path("screenshots")
         self.screenshots_dir.mkdir(exist_ok=True)
         
+        # Настройки по умолчанию
+        self.settings = {
+            'confidence': 0.5,
+            'show_boxes': True,
+            'show_labels': True,
+            'show_conf': True,
+            'box_color': '#3b82f6',
+            'text_color': '#ffffff',
+            'box_thickness': 2,
+            'font_size': 12,
+            'save_interval': 300,  # 5 минут
+            'max_fps': 30,
+            'detection_mode': 'balanced'  # fast, balanced, accurate
+        }
+        
         # Запуск Flask
         self.flask_thread = threading.Thread(target=self.start_flask_server)
         self.flask_thread.daemon = True
@@ -96,7 +111,7 @@ class WebRTCYOLOAnnotator:
         """Запуск Flask сервера"""
         app = Flask(__name__)
         
-        # Минималистичный HTML интерфейс
+        # Современный HTML интерфейс с Bootstrap 5
         HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -104,507 +119,1023 @@ class WebRTCYOLOAnnotator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vision AI Annotator</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --dark-bg: #0f172a;
+            --dark-card: rgba(30, 41, 59, 0.8);
+            --light-bg: #f8fafc;
+            --light-card: rgba(255, 255, 255, 0.8);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --accent-color: #3b82f6;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+        
+        [data-bs-theme="dark"] {
+            background-color: var(--dark-bg) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        [data-bs-theme="light"] {
+            background-color: var(--light-bg) !important;
+            color: #1e293b !important;
         }
         
         body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+        /* Glass effect */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
-        .header {
-            background: #2c3e50;
+        .glass-dark {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .glass-light {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-glass {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: inherit;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-glass:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-glass-primary {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.3);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
         
-        .header h1 {
-            font-size: 1.8rem;
+        .navbar-glass {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 20px;
-            margin-bottom: 20px;
+        .navbar-glass[data-bs-theme="light"] {
+            background: rgba(248, 250, 252, 0.9);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
         
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
+        .card-glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            transition: all 0.3s ease;
         }
         
-        .video-section {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        [data-bs-theme="light"] .card-glass {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.1);
         }
         
-        .video-container {
+        .card-glass:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .video-container-wrapper {
             position: relative;
-            width: 100%;
-            background: black;
-            border-radius: 8px;
+            border-radius: 20px;
             overflow: hidden;
-            margin-bottom: 20px;
+            background: #000;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.1);
         }
         
-        .video-container video,
-        .video-container canvas {
-            width: 100%;
-            height: auto;
-            display: block;
+        #webcamCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
         }
         
         .video-overlay {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 0.9rem;
-            display: flex;
-            justify-content: space-between;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+            padding: 1.5rem;
+            z-index: 10;
         }
         
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .btn {
-            padding: 12px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        
-        .btn-primary {
-            background: #3498db;
-            color: white;
-        }
-        
-        .btn-success {
-            background: #2ecc71;
-            color: white;
-        }
-        
-        .btn-warning {
-            background: #f39c12;
-            color: white;
-        }
-        
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
-        }
-        
-        .btn-info {
-            background: #1abc9c;
-            color: white;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            font-size: 1.5rem;
-            margin: 10px 0;
-            color: #2c3e50;
-        }
-        
-        .stat-card p {
-            color: #7f8c8d;
-            font-size: 0.9rem;
-        }
-        
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .card h3 {
-            margin-bottom: 15px;
-            color: #2c3e50;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 10px;
-        }
-        
-        .detection-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .detection-item {
-            padding: 10px;
-            border-bottom: 1px solid #ecf0f1;
-            display: flex;
-            justify-content: space-between;
-        }
-        
-        .detection-item:last-child {
-            border-bottom: none;
-        }
-        
-        .object-badge {
-            display: inline-block;
-            background: #3498db;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            margin: 2px;
-        }
-        
-        .object-distribution {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        
-        .object-item {
-            flex: 1;
-            min-width: 120px;
-            background: #ecf0f1;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        
-        .object-item span {
-            display: block;
-            font-weight: bold;
-            font-size: 1.2rem;
-            color: #2c3e50;
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(21, 128, 61, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
         }
         
         .status-indicator {
-            display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            margin-right: 5px;
+            animation: pulse 2s infinite;
         }
         
-        .status-active {
-            background: #2ecc71;
-            box-shadow: 0 0 10px #2ecc71;
+        .status-active { background: #22c55e; }
+        .status-paused { background: #ef4444; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
         
-        .status-paused {
-            background: #e74c3c;
-            box-shadow: 0 0 10px #e74c3c;
+        .stat-card {
+            padding: 1.5rem;
+            text-align: center;
+            border-radius: 16px;
         }
         
-        .camera-selection {
-            margin-bottom: 20px;
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
         }
         
-        .camera-list {
+        [data-bs-theme="dark"] .stat-value {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        [data-bs-theme="light"] .stat-value {
+            background: linear-gradient(135deg, #1e40af, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        [data-bs-theme="dark"] .stat-label {
+            color: var(--text-secondary);
+        }
+        
+        [data-bs-theme="light"] .stat-label {
+            color: #64748b;
+        }
+        
+        .object-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin: 4px;
+        }
+        
+        .detection-item {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            transition: background 0.2s ease;
         }
         
-        .camera-btn {
-            flex: 1;
-            min-width: 150px;
-            background: #ecf0f1;
-            border: 2px solid transparent;
-            padding: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
+        [data-bs-theme="dark"] .detection-item {
+            border-bottom: 1px solid var(--border-color);
         }
         
-        .camera-btn:hover {
-            background: #bdc3c7;
+        [data-bs-theme="light"] .detection-item {
+            border-bottom: 1px solid #e2e8f0;
         }
         
-        .camera-btn.active {
-            background: #3498db;
-            color: white;
-            border-color: #2980b9;
+        .detection-item:hover {
+            background: rgba(255, 255, 255, 0.05);
         }
         
-        .progress-bar {
+        [data-bs-theme="light"] .detection-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        
+        .progress-bar-custom {
             height: 6px;
-            background: #ecf0f1;
             border-radius: 3px;
             overflow: hidden;
-            margin-top: 5px;
+            margin-top: 8px;
         }
         
-        .progress {
+        [data-bs-theme="dark"] .progress-bar-custom {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-bs-theme="light"] .progress-bar-custom {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .progress-custom {
             height: 100%;
-            background: #3498db;
-            transition: width 0.3s;
+            background: var(--primary-gradient);
+            transition: width 0.3s ease;
+        }
+        
+        .control-panel {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        
+        .settings-panel {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        [data-bs-theme="light"] .settings-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-range::-webkit-slider-thumb {
+            background: var(--accent-color);
+        }
+        
+        .form-range::-moz-range-thumb {
+            background: var(--accent-color);
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+        }
+        
+        [data-bs-theme="dark"] .empty-state {
+            color: var(--text-secondary);
+        }
+        
+        [data-bs-theme="light"] .empty-state {
+            color: #64748b;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 200px;
+            margin: 1rem 0;
+        }
+        
+        .floating-controls {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+        
+        .floating-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .floating-btn:hover {
+            transform: scale(1.1) translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .color-picker {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+        }
+        
+        .nav-tabs-glass {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-bs-theme="light"] .nav-tabs-glass {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-tabs-glass .nav-link {
+            color: inherit;
+            border: none;
+            background: transparent;
+            border-radius: 12px 12px 0 0;
+            margin-bottom: -1px;
+            padding: 12px 24px;
+        }
+        
+        .nav-tabs-glass .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom: 2px solid var(--accent-color);
+        }
+        
+        [data-bs-theme="light"] .nav-tabs-glass .nav-link.active {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        
+        .tab-pane {
+            padding: 1.5rem 0;
+        }
+        
+        .slider-with-value {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .slider-with-value input {
+            flex: 1;
+        }
+        
+        .slider-value {
+            min-width: 60px;
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .floating-controls {
+                bottom: 1rem;
+                right: 1rem;
+            }
+            
+            .stat-value {
+                font-size: 2rem;
+            }
+            
+            .video-container-wrapper {
+                border-radius: 12px;
+            }
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        [data-bs-theme="light"] ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        
+        [data-bs-theme="light"] ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        [data-bs-theme="light"] ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .glow {
+            animation: glow 2s infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            to { box-shadow: 0 0 30px rgba(59, 130, 246, 0.8); }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <!-- Заголовок -->
-        <div class="header">
-            <h1>🚀 Vision AI Annotator</h1>
-            <div>
-                <span class="status-indicator" id="statusIndicator"></span>
-                <span id="statusText">Активно</span>
+<body data-bs-theme="dark">
+    <!-- Navigation -->
+    <nav class="navbar navbar-glass navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <div class="p-2 rounded glass" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <i class="bi bi-eye-fill text-white"></i>
+                </div>
+                <span class="fw-bold">Vision AI Annotator</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-3">
+                <div class="status-badge glass">
+                    <span class="status-indicator status-active" id="statusIndicator"></span>
+                    <span id="statusText" class="small fw-medium">Подключение...</span>
+                </div>
+                <button class="btn btn-glass btn-sm" onclick="toggleTheme()" id="themeToggle">
+                    <i class="bi bi-moon-stars"></i>
+                </button>
             </div>
         </div>
-        
-        <div class="main-content">
-            <!-- Левая колонка -->
-            <div class="video-section">
-                <!-- Выбор камеры -->
-                <div class="camera-selection">
-                    <h3>📷 Выбор камеры</h3>
-                    <div class="camera-list" id="cameraList">
-                        <button class="camera-btn active" onclick="selectCamera('default')">
-                            Камера по умолчанию
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid py-4">
+        <div class="row g-4">
+            <!-- Left Column - Video Feed -->
+            <div class="col-xl-8 col-lg-7">
+                <!-- Video Container -->
+                <div class="card-glass p-0 mb-4">
+                    <div class="video-container-wrapper">
+                        <div class="video-overlay">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-3">
+                                    <h5 class="mb-0 text-white"><i class="bi bi-camera-video"></i> Live Feed</h5>
+                                    <span class="badge glass" style="background: rgba(0,0,0,0.5);">
+                                        <i class="bi bi-lightning-charge"></i> <span id="fpsDisplay">0</span> FPS
+                                    </span>
+                                </div>
+                                <div id="currentObjects" class="d-flex flex-wrap gap-2"></div>
+                            </div>
+                        </div>
+                        <video id="webcamVideo" autoplay playsinline class="w-100" style="max-height: 70vh; object-fit: contain;"></video>
+                        <canvas id="webcamCanvas" class="w-100"></canvas>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3 col-6">
+                        <button class="btn btn-glass-primary w-100 d-flex align-items-center justify-content-center gap-2" onclick="startWebcam()" id="startBtn">
+                            <i class="bi bi-camera-video"></i> <span>Старт</span>
+                        </button>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <button class="btn btn-glass w-100 d-flex align-items-center justify-content-center gap-2" onclick="togglePause()" id="pauseBtn">
+                            <i class="bi bi-pause-circle"></i> <span>Пауза</span>
+                        </button>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <button class="btn btn-glass w-100 d-flex align-items-center justify-content-center gap-2" onclick="takeSnapshot()">
+                            <i class="bi bi-camera"></i> <span>Снимок</span>
+                        </button>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <button class="btn btn-glass w-100 d-flex align-items-center justify-content-center gap-2" onclick="saveSession()">
+                            <i class="bi bi-save"></i> <span>Сохранить</span>
                         </button>
                     </div>
                 </div>
-                
-                <!-- Видео поток -->
-                <h3>🎥 Видео поток</h3>
-                <div class="video-container">
-                    <video id="webcamVideo" autoplay playsinline></video>
-                    <canvas id="webcamCanvas"></canvas>
-                    <div class="video-overlay">
-                        <div id="videoStats">
-                            FPS: <span id="fpsDisplay">0</span> | 
-                            Кадров: <span id="frameCount">0</span> | 
-                            Объектов: <span id="objectCount">0</span>
+
+                <!-- Statistics Cards -->
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="card-glass stat-card">
+                            <div class="stat-value" id="totalFrames">0</div>
+                            <div class="stat-label">Кадров</div>
                         </div>
-                        <div id="currentObjects"></div>
                     </div>
-                </div>
-                
-                <!-- Управление -->
-                <div class="controls">
-                    <button class="btn btn-success" onclick="startWebcam()" id="startBtn">
-                        ▶ Запустить камеру
-                    </button>
-                    <button class="btn btn-warning" onclick="togglePause()" id="pauseBtn">
-                        ⏸ Пауза
-                    </button>
-                    <button class="btn btn-info" onclick="takeSnapshot()">
-                        📷 Скриншот
-                    </button>
-                    <button class="btn btn-primary" onclick="saveSession()">
-                        💾 Сохранить
-                    </button>
-                    <button class="btn btn-primary" onclick="downloadAnnotations()">
-                        📥 Экспорт
-                    </button>
-                    <button class="btn" onclick="showSettings()" style="background: #9b59b6; color: white;">
-        ⚙ Настройки
-                    </button>
-                </div>
-                
-                <!-- Статистика -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <p>Кадров обработано</p>
-                        <h3 id="totalFrames">0</h3>
+                    <div class="col-md-3 col-6">
+                        <div class="card-glass stat-card">
+                            <div class="stat-value" id="savedFrames">0</div>
+                            <div class="stat-label">Сохранено</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <p>Кадров сохранено</p>
-                        <h3 id="savedFrames">0</h3>
+                    <div class="col-md-3 col-6">
+                        <div class="card-glass stat-card">
+                            <div class="stat-value" id="totalObjects">0</div>
+                            <div class="stat-label">Объектов</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <p>Всего объектов</p>
-                        <h3 id="totalObjects">0</h3>
-                    </div>
-                    <div class="stat-card">
-                        <p>Активные клиенты</p>
-                        <h3 id="activeClients">0</h3>
+                    <div class="col-md-3 col-6">
+                        <div class="card-glass stat-card">
+                            <div class="stat-value" id="activeClients">0</div>
+                            <div class="stat-label">Клиентов</div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Правая колонка -->
-            <div class="sidebar">
-                <!-- Последние обнаружения -->
-                <div class="card">
-                    <h3>🎯 Последние обнаружения</h3>
-                    <div class="detection-list" id="detectionsList">
-                        <div class="detection-item">
-                            <span>Нет обнаружений</span>
-                            <span>--:--:--</span>
+
+            <!-- Right Column - Sidebar -->
+            <div class="col-xl-4 col-lg-5">
+                <div class="control-panel">
+                    <!-- Recent Detections -->
+                    <div class="card-glass mb-4">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0"><i class="bi bi-bullseye"></i> Обнаружения</h5>
+                                <span class="badge glass" style="background: rgba(0,0,0,0.3);" id="detectionCount">0</span>
+                            </div>
+                            <div class="detection-list" id="detectionsList" style="max-height: 300px; overflow-y: auto;">
+                                <div class="empty-state">
+                                    <i class="bi bi-eye-slash"></i>
+                                    <p class="mb-0">Нет обнаружений</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Распределение объектов -->
-                <div class="card">
-                    <h3>📊 Распределение объектов</h3>
-                    <div class="object-distribution" id="objectDistribution">
-                        <div class="object-item">
-                            <span>0</span>
-                            <small>Нет данных</small>
+
+                    <!-- Object Distribution -->
+                    <div class="card-glass mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3"><i class="bi bi-pie-chart"></i> Распределение</h5>
+                            <div id="objectDistribution" class="mb-3"></div>
+                            <div class="chart-container">
+                                <canvas id="objectsChart"></canvas>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Настройки -->
-                <div class="card" id="settingsPanel" style="display: none;">
-                    <h3>⚙ Настройки</h3>
-                    <div style="margin-bottom: 15px;">
-                        <label>Порог уверенности: <span id="confidenceValue">0.5</span></label>
-                        <input type="range" id="confidenceSlider" min="0.1" max="0.9" step="0.1" value="0.5" 
-                               oninput="updateConfidence(this.value)" style="width: 100%;">
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <label>
-                            <input type="checkbox" id="showBoxes" checked onchange="toggleBoxes()">
-                            Показывать рамки
-                        </label>
-                    </div>
-                    <div>
-                        <button class="btn btn-primary" onclick="applySettings()" style="width: 100%;">
-                            Применить настройки
-                        </button>
+
+                    <!-- Performance Graph -->
+                    <div class="card-glass">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3"><i class="bi bi-graph-up"></i> Производительность</h5>
+                            <div class="chart-container">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content settings-panel">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title"><i class="bi bi-sliders"></i> Расширенные настройки</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs nav-tabs-glass mb-4" id="settingsTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#basic-tab">
+                                <i class="bi bi-gear"></i> Основные
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#visual-tab">
+                                <i class="bi bi-palette"></i> Визуальные
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#advanced-tab">
+                                <i class="bi bi-cpu"></i> Расширенные
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#export-tab">
+                                <i class="bi bi-download"></i> Экспорт
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Basic Settings -->
+                        <div class="tab-pane fade show active" id="basic-tab">
+                            <div class="mb-4">
+                                <label class="form-label">Порог уверенности: <span id="confidenceValue" class="fw-bold">0.5</span></label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="confidenceSlider" min="0.1" max="0.9" step="0.05" value="0.5">
+                                    <span class="slider-value" id="confidencePercent">50%</span>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Частота обработки</label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="fpsSlider" min="1" max="30" step="1" value="10">
+                                    <span class="slider-value"><span id="fpsValue">10</span> FPS</span>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Режим детекции</label>
+                                <select class="form-select glass" id="detectionMode">
+                                    <option value="fast">Быстрый</option>
+                                    <option value="balanced" selected>Сбалансированный</option>
+                                    <option value="accurate">Точный</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoSave" checked>
+                                    <label class="form-check-label" for="autoSave">Автосохранение</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Visual Settings -->
+                        <div class="tab-pane fade" id="visual-tab">
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <label class="form-label">Цвет рамок</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <input type="color" class="color-picker" id="boxColor" value="#3b82f6">
+                                        <span id="boxColorText" class="small">#3b82f6</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Цвет текста</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <input type="color" class="color-picker" id="textColor" value="#ffffff">
+                                        <span id="textColorText" class="small">#ffffff</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="form-label">Толщина рамок</label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="boxThickness" min="1" max="5" step="1" value="2">
+                                    <span class="slider-value"><span id="thicknessValue">2</span> px</span>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="form-label">Размер шрифта</label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="fontSize" min="10" max="24" step="1" value="12">
+                                    <span class="slider-value"><span id="fontValue">12</span> px</span>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="showBoxes" checked>
+                                    <label class="form-check-label" for="showBoxes">Показывать рамки</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="showLabels" checked>
+                                    <label class="form-check-label" for="showLabels">Показывать метки</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showConfidence" checked>
+                                    <label class="form-check-label" for="showConfidence">Показывать уверенность</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Settings -->
+                        <div class="tab-pane fade" id="advanced-tab">
+                            <div class="mb-4">
+                                <label class="form-label">Порог IoU (пересечения)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="iouSlider" min="0.1" max="0.9" step="0.05" value="0.3">
+                                    <span class="slider-value" id="iouValue">0.3</span>
+                                </div>
+                                <div class="form-text">Определяет насколько объекты должны пересекаться</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Порог движения (пикселей)</label>
+                                <div class="slider-with-value">
+                                    <input type="range" class="form-range" id="motionSlider" min="10" max="200" step="10" value="50">
+                                    <span class="slider-value"><span id="motionValue">50</span> px</span>
+                                </div>
+                                <div class="form-text">Чувствительность к движению объектов</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Интервал автосохранения</label>
+                                <select class="form-select glass" id="saveInterval">
+                                    <option value="60">1 минута</option>
+                                    <option value="300" selected>5 минут</option>
+                                    <option value="600">10 минут</option>
+                                    <option value="1800">30 минут</option>
+                                </select>
+                            </div>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <small>Эти настройки влияют на производительность и точность системы</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Export Settings -->
+                        <div class="tab-pane fade" id="export-tab">
+                            <div class="mb-4">
+                                <label class="form-label">Формат экспорта</label>
+                                <select class="form-select glass" id="exportFormat">
+                                    <option value="json">JSON</option>
+                                    <option value="csv">CSV</option>
+                                    <option value="xml">XML</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label">Включать в экспорт:</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="includeImages" checked>
+                                    <label class="form-check-label" for="includeImages">Ссылки на изображения</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="includeMetadata" checked>
+                                    <label class="form-check-label" for="includeMetadata">Метаданные</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="includeStatistics" checked>
+                                    <label class="form-check-label" for="includeStatistics">Статистику</label>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <button class="btn btn-glass w-100 mb-2" onclick="exportAnnotations()">
+                                    <i class="bi bi-download"></i> Экспорт аннотаций
+                                </button>
+                                <button class="btn btn-glass w-100 mb-2" onclick="clearAnnotations()">
+                                    <i class="bi bi-trash"></i> Очистить аннотации
+                                </button>
+                                <button class="btn btn-glass w-100" onclick="resetStatistics()">
+                                    <i class="bi bi-arrow-clockwise"></i> Сбросить статистику
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-glass-primary" onclick="applySettings()">Применить настройки</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-controls">
+        <button class="floating-btn btn-glass-primary" onclick="downloadAnnotations()" data-bs-toggle="tooltip" title="Экспорт аннотаций">
+            <i class="bi bi-download"></i>
+        </button>
+        <button class="floating-btn glass" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Настройки">
+            <i class="bi bi-sliders"></i>
+        </button>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-        // Глобальные переменные
+        // Global variables
         let cameraStream = null;
-        let selectedCamera = 'default';
         let isProcessing = false;
         let clientId = null;
         let frameInterval = null;
+        let charts = {};
         let settings = {
             confidence: 0.5,
-            showBoxes: true
+            showBoxes: true,
+            showLabels: true,
+            showConfidence: true,
+            fps: 10,
+            autoSave: true,
+            detectionMode: 'balanced',
+            boxColor: '#3b82f6',
+            textColor: '#ffffff',
+            boxThickness: 2,
+            fontSize: 12,
+            iouThreshold: 0.3,
+            motionThreshold: 50,
+            saveInterval: 300
         };
         
-        // Генерация ID клиента
+        // Chart colors
+        const chartColorsDark = {
+            primary: 'rgba(59, 130, 246, 0.5)',
+            secondary: 'rgba(147, 51, 234, 0.5)',
+            success: 'rgba(34, 197, 94, 0.5)',
+            grid: 'rgba(255, 255, 255, 0.1)',
+            text: 'rgba(248, 250, 252, 0.8)'
+        };
+        
+        const chartColorsLight = {
+            primary: 'rgba(30, 64, 175, 0.5)',
+            secondary: 'rgba(124, 58, 237, 0.5)',
+            success: 'rgba(21, 128, 61, 0.5)',
+            grid: 'rgba(0, 0, 0, 0.1)',
+            text: 'rgba(30, 41, 59, 0.8)'
+        };
+        
+        // Initialize charts
+        function initCharts() {
+            const objectsCtx = document.getElementById('objectsChart').getContext('2d');
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            
+            const colors = document.documentElement.getAttribute('data-bs-theme') === 'dark' 
+                ? chartColorsDark : chartColorsLight;
+            
+            charts.objects = new Chart(objectsCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Объекты',
+                        data: [],
+                        borderColor: colors.primary.replace('0.5', '1'),
+                        backgroundColor: colors.primary,
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: colors.grid },
+                            ticks: { color: colors.text }
+                        },
+                        x: {
+                            display: false
+                        }
+                    }
+                }
+            });
+            
+            charts.performance = new Chart(perfCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'FPS',
+                        data: [],
+                        borderColor: colors.success.replace('0.5', '1'),
+                        backgroundColor: colors.success,
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: colors.grid },
+                            ticks: { color: colors.text }
+                        },
+                        x: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update chart colors based on theme
+        function updateChartColors() {
+            const colors = document.documentElement.getAttribute('data-bs-theme') === 'dark' 
+                ? chartColorsDark : chartColorsLight;
+            
+            if (charts.objects) {
+                charts.objects.data.datasets[0].borderColor = colors.primary.replace('0.5', '1');
+                charts.objects.data.datasets[0].backgroundColor = colors.primary;
+                charts.objects.options.scales.y.grid.color = colors.grid;
+                charts.objects.options.scales.y.ticks.color = colors.text;
+                charts.objects.update();
+            }
+            
+            if (charts.performance) {
+                charts.performance.data.datasets[0].borderColor = colors.success.replace('0.5', '1');
+                charts.performance.data.datasets[0].backgroundColor = colors.success;
+                charts.performance.options.scales.y.grid.color = colors.grid;
+                charts.performance.options.scales.y.ticks.color = colors.text;
+                charts.performance.update();
+            }
+        }
+        
+        // Load settings from localStorage
+        function loadSettings() {
+            const saved = localStorage.getItem('visionai_settings');
+            if (saved) {
+                settings = { ...settings, ...JSON.parse(saved) };
+            }
+            updateSettingsUI();
+        }
+        
+        // Save settings to localStorage
+        function saveSettings() {
+            localStorage.setItem('visionai_settings', JSON.stringify(settings));
+        }
+        
+        // Update settings UI
+        function updateSettingsUI() {
+            // Update sliders and values
+            document.getElementById('confidenceSlider').value = settings.confidence;
+            document.getElementById('confidenceValue').textContent = settings.confidence.toFixed(2);
+            document.getElementById('confidencePercent').textContent = Math.round(settings.confidence * 100) + '%';
+            
+            document.getElementById('fpsSlider').value = settings.fps;
+            document.getElementById('fpsValue').textContent = settings.fps;
+            
+            document.getElementById('detectionMode').value = settings.detectionMode;
+            document.getElementById('autoSave').checked = settings.autoSave;
+            
+            // Visual settings
+            document.getElementById('boxColor').value = settings.boxColor;
+            document.getElementById('boxColorText').textContent = settings.boxColor;
+            document.getElementById('textColor').value = settings.textColor;
+            document.getElementById('textColorText').textContent = settings.textColor;
+            document.getElementById('boxThickness').value = settings.boxThickness;
+            document.getElementById('thicknessValue').textContent = settings.boxThickness;
+            document.getElementById('fontSize').value = settings.fontSize;
+            document.getElementById('fontValue').textContent = settings.fontSize;
+            document.getElementById('showBoxes').checked = settings.showBoxes;
+            document.getElementById('showLabels').checked = settings.showLabels;
+            document.getElementById('showConfidence').checked = settings.showConfidence;
+            
+            // Advanced settings
+            document.getElementById('iouSlider').value = settings.iouThreshold;
+            document.getElementById('iouValue').textContent = settings.iouThreshold.toFixed(2);
+            document.getElementById('motionSlider').value = settings.motionThreshold;
+            document.getElementById('motionValue').textContent = settings.motionThreshold;
+            document.getElementById('saveInterval').value = settings.saveInterval;
+        }
+        
+        // Generate client ID
         function generateClientId() {
             return 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
         
-        // Загрузка доступных камер
-        async function loadCameras() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                const cameraList = document.getElementById('cameraList');
-                
-                cameraList.innerHTML = '';
-                
-                videoDevices.forEach((device, index) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'camera-btn';
-                    btn.textContent = device.label || `Камера ${index + 1}`;
-                    btn.onclick = () => selectCamera(device.deviceId, btn);
-                    
-                    if (index === 0) {
-                        btn.classList.add('active');
-                        selectedCamera = device.deviceId;
-                    }
-                    
-                    cameraList.appendChild(btn);
-                });
-                
-                if (videoDevices.length === 0) {
-                    cameraList.innerHTML = '<p style="color: #e74c3c;">Камеры не найдены</p>';
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки камер:', error);
-                document.getElementById('cameraList').innerHTML = 
-                    '<p style="color: #e74c3c;">Ошибка доступа к камерам</p>';
-            }
-        }
-        
-        // Выбор камеры
-        function selectCamera(deviceId, element) {
-            // Сброс активного класса
-            document.querySelectorAll('.camera-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Установка активного класса
-            if (element) {
-                element.classList.add('active');
-            }
-            
-            selectedCamera = deviceId;
-            
-            // Перезапуск камеры если она уже запущена
-            if (cameraStream) {
-                startWebcam();
-            }
-        }
-        
-        // Запуск веб-камеры
+        // Start webcam
         async function startWebcam() {
             try {
-                // Остановка предыдущего потока
                 if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
+                    stopWebcam();
+                    return;
                 }
                 
-                // Настройки захвата
                 const constraints = {
                     video: {
-                        deviceId: selectedCamera !== 'default' ? { exact: selectedCamera } : undefined,
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
                         frameRate: { ideal: 30 }
@@ -612,29 +1143,31 @@ class WebRTCYOLOAnnotator:
                     audio: false
                 };
                 
-                // Получение потока
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('webcamVideo');
                 video.srcObject = cameraStream;
                 
-                // Обновление кнопки
-                document.getElementById('startBtn').innerHTML = '⏹ Остановить';
-                document.getElementById('startBtn').className = 'btn btn-danger';
-                document.getElementById('startBtn').onclick = stopWebcam;
+                // Update UI
+                document.getElementById('startBtn').innerHTML = '<i class="bi bi-stop-circle"></i> <span>Стоп</span>';
+                document.getElementById('startBtn').classList.remove('btn-glass-primary');
+                document.getElementById('startBtn').classList.add('btn-danger');
                 
-                // Генерация ID клиента
+                // Generate client ID
                 clientId = generateClientId();
                 
-                // Запуск обработки кадров
+                // Start frame processing
                 startFrameProcessing();
                 
+                // Show success message
+                showToast('Камера подключена', 'success');
+                
             } catch (error) {
-                console.error('Ошибка доступа к камере:', error);
-                alert(`Ошибка доступа к камере: ${error.message}`);
+                console.error('Camera error:', error);
+                showToast('Ошибка доступа к камере', 'error');
             }
         }
         
-        // Остановка веб-камеры
+        // Stop webcam
         function stopWebcam() {
             if (cameraStream) {
                 cameraStream.getTracks().forEach(track => track.stop());
@@ -645,55 +1178,51 @@ class WebRTCYOLOAnnotator:
                     frameInterval = null;
                 }
                 
-                // Обновление кнопки
-                document.getElementById('startBtn').innerHTML = '▶ Запустить камеру';
-                document.getElementById('startBtn').className = 'btn btn-success';
-                document.getElementById('startBtn').onclick = startWebcam;
+                // Update UI
+                document.getElementById('startBtn').innerHTML = '<i class="bi bi-camera-video"></i> <span>Старт</span>';
+                document.getElementById('startBtn').classList.remove('btn-danger');
+                document.getElementById('startBtn').classList.add('btn-glass-primary');
                 
-                // Очистка canvas
+                // Clear canvas
                 const canvas = document.getElementById('webcamCanvas');
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
         
-        // Запуск обработки кадров
+        // Start frame processing
         function startFrameProcessing() {
             const video = document.getElementById('webcamVideo');
             const canvas = document.getElementById('webcamCanvas');
             const ctx = canvas.getContext('2d');
             
-            // Установка размеров canvas
             video.onloadedmetadata = () => {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
             };
             
-            // Интервал обработки кадров (10 FPS)
+            // Set processing interval based on settings
+            const interval = 1000 / settings.fps;
+            if (frameInterval) clearInterval(frameInterval);
             frameInterval = setInterval(() => {
                 if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
                     processFrame(video, canvas, ctx);
                 }
-            }, 100);
+            }, interval);
         }
         
-        // Обработка кадра
+        // Process frame
         async function processFrame(video, canvas, ctx) {
             isProcessing = true;
             
-            // Рисуем кадр на canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Получаем изображение в base64
             const imageData = canvas.toDataURL('image/jpeg', 0.8);
             
             try {
-                // Отправляем на сервер
                 const response = await fetch('/api/process_frame', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         image: imageData,
                         client_id: clientId,
@@ -704,60 +1233,57 @@ class WebRTCYOLOAnnotator:
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Отображение рамок если нужно
                     if (settings.showBoxes && data.annotations) {
                         drawBoundingBoxes(ctx, data.annotations);
                     }
-                    
-                    // Обновление текущих объектов
                     updateCurrentObjects(data.annotations || []);
                 }
             } catch (error) {
-                console.error('Ошибка обработки кадра:', error);
+                console.error('Frame processing error:', error);
             } finally {
                 isProcessing = false;
             }
         }
         
-        // Отрисовка рамок
+        // Draw bounding boxes
         function drawBoundingBoxes(ctx, annotations) {
+            ctx.lineWidth = settings.boxThickness;
             annotations.forEach(ann => {
                 const { x1, y1, x2, y2, label, confidence } = ann;
                 
-                // Рисуем прямоугольник
-                ctx.strokeStyle = '#00FF00';
-                ctx.lineWidth = 2;
+                // Draw box
+                ctx.strokeStyle = settings.boxColor;
                 ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
                 
-                // Рисуем подпись
-                ctx.fillStyle = '#00FF00';
-                ctx.font = '14px Arial';
-                const text = `${label} ${(confidence * 100).toFixed(1)}%`;
-                
-                // Фон для текста
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                const textWidth = ctx.measureText(text).width;
-                ctx.fillRect(x1, y1 - 20, textWidth + 10, 20);
-                
-                // Текст
-                ctx.fillStyle = '#00FF00';
-                ctx.fillText(text, x1 + 5, y1 - 5);
+                // Draw label if enabled
+                if (settings.showLabels) {
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                    let text = label;
+                    if (settings.showConfidence) {
+                        text += ` ${(confidence * 100).toFixed(0)}%`;
+                    }
+                    ctx.font = `bold ${settings.fontSize}px Segoe UI`;
+                    const textWidth = ctx.measureText(text).width;
+                    
+                    ctx.fillRect(x1, y1 - (settings.fontSize + 10), textWidth + 10, settings.fontSize + 10);
+                    ctx.fillStyle = settings.textColor;
+                    ctx.fillText(text, x1 + 5, y1 - 5);
+                }
             });
         }
         
-        // Обновление текущих объектов
+        // Update current objects display
         function updateCurrentObjects(annotations) {
-            const currentObjectsDiv = document.getElementById('currentObjects');
-            const objectCount = annotations.length;
+            const container = document.getElementById('currentObjects');
+            const count = annotations.length;
             
-            document.getElementById('objectCount').textContent = objectCount;
+            document.getElementById('detectionCount').textContent = count;
             
-            if (objectCount === 0) {
-                currentObjectsDiv.innerHTML = '<span style="color: #95a5a6;">Нет объектов</span>';
+            if (count === 0) {
+                container.innerHTML = '<span class="text-muted">Объекты не обнаружены</span>';
                 return;
             }
             
-            // Группировка по классам
             const classCounts = {};
             annotations.forEach(ann => {
                 classCounts[ann.label] = (classCounts[ann.label] || 0) + 1;
@@ -768,64 +1294,103 @@ class WebRTCYOLOAnnotator:
                 html += `<span class="object-badge">${label}: ${count}</span>`;
             }
             
-            currentObjectsDiv.innerHTML = html;
+            container.innerHTML = html;
         }
         
-        // Обновление статистики
+        // Update statistics
         async function updateStats() {
             try {
                 const response = await fetch('/api/stats');
                 const data = await response.json();
                 
-                // Обновление статистики
-                document.getElementById('totalFrames').textContent = data.total_frames;
-                document.getElementById('savedFrames').textContent = data.saved_frames;
-                document.getElementById('totalObjects').textContent = data.total_objects;
+                // Update stats
+                document.getElementById('totalFrames').textContent = data.total_frames.toLocaleString();
+                document.getElementById('savedFrames').textContent = data.saved_frames.toLocaleString();
+                document.getElementById('totalObjects').textContent = data.total_objects.toLocaleString();
                 document.getElementById('activeClients').textContent = data.active_clients || 0;
                 document.getElementById('fpsDisplay').textContent = data.fps.toFixed(1);
-                document.getElementById('frameCount').textContent = data.total_frames;
                 
-                // Обновление статуса
+                // Update status
                 const indicator = document.getElementById('statusIndicator');
                 const statusText = document.getElementById('statusText');
                 
                 if (data.is_paused) {
                     indicator.className = 'status-indicator status-paused';
                     statusText.textContent = 'Пауза';
-                    document.getElementById('pauseBtn').innerHTML = '▶ Возобновить';
+                    document.getElementById('pauseBtn').innerHTML = '<i class="bi bi-play-circle"></i> <span>Продолжить</span>';
                 } else {
                     indicator.className = 'status-indicator status-active';
                     statusText.textContent = 'Активно';
-                    document.getElementById('pauseBtn').innerHTML = '⏸ Пауза';
+                    document.getElementById('pauseBtn').innerHTML = '<i class="bi bi-pause-circle"></i> <span>Пауза</span>';
                 }
                 
-                // Обновление последних обнаружений
+                // Update detections list
                 updateDetectionsList(data.recent_detections || []);
                 
-                // Обновление распределения объектов
+                // Update object distribution
                 updateObjectDistribution(data.object_counts || {});
                 
+                // Update charts
+                updateCharts(data);
+                
             } catch (error) {
-                console.error('Ошибка обновления статистики:', error);
+                console.error('Stats update error:', error);
             }
         }
         
-        // Обновление списка обнаружений
+        // Update charts
+        function updateCharts(data) {
+            const timeLabel = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            
+            if (charts.objects) {
+                charts.objects.data.labels.push(timeLabel);
+                charts.objects.data.datasets[0].data.push(data.total_objects);
+                
+                if (charts.objects.data.labels.length > 15) {
+                    charts.objects.data.labels.shift();
+                    charts.objects.data.datasets[0].data.shift();
+                }
+                
+                charts.objects.update();
+            }
+            
+            if (charts.performance) {
+                charts.performance.data.labels.push(timeLabel);
+                charts.performance.data.datasets[0].data.push(data.fps);
+                
+                if (charts.performance.data.labels.length > 15) {
+                    charts.performance.data.labels.shift();
+                    charts.performance.data.datasets[0].data.shift();
+                }
+                
+                charts.performance.update();
+            }
+        }
+        
+        // Update detections list
         function updateDetectionsList(detections) {
             const list = document.getElementById('detectionsList');
             
             if (detections.length === 0) {
-                list.innerHTML = '<div class="detection-item"><span>Нет обнаружений</span><span>--:--:--</span></div>';
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-eye-slash"></i>
+                        <p class="mb-0">Нет обнаружений</p>
+                    </div>
+                `;
                 return;
             }
             
             let html = '';
-            detections.slice(-8).reverse().forEach(detection => {
-                const time = detection.timestamp.split('T')[1].split('.')[0];
+            detections.slice(-5).reverse().forEach(detection => {
+                const time = new Date(detection.timestamp).toLocaleTimeString('ru-RU');
                 html += `
-                    <div class="detection-item">
-                        <span>${detection.label} (${detection.confidence}%)</span>
-                        <span>${time}</span>
+                    <div class="detection-item fade-in">
+                        <div>
+                            <span class="fw-medium">${detection.label}</span>
+                            <div class="small text-muted">${detection.confidence}% уверенности</div>
+                        </div>
+                        <span class="text-muted small">${time}</span>
                     </div>
                 `;
             });
@@ -833,30 +1398,36 @@ class WebRTCYOLOAnnotator:
             list.innerHTML = html;
         }
         
-        // Обновление распределения объектов
+        // Update object distribution
         function updateObjectDistribution(objectCounts) {
             const container = document.getElementById('objectDistribution');
             
             if (Object.keys(objectCounts).length === 0) {
-                container.innerHTML = '<div class="object-item"><span>0</span><small>Нет данных</small></div>';
+                container.innerHTML = `
+                    <div class="empty-state py-3">
+                        <p class="mb-0 small text-muted">Нет данных</p>
+                    </div>
+                `;
                 return;
             }
             
             let html = '';
             const sorted = Object.entries(objectCounts)
                 .sort((a, b) => b[1] - a[1])
-                .slice(0, 6);
+                .slice(0, 5);
             
             sorted.forEach(([label, count]) => {
                 const total = Object.values(objectCounts).reduce((a, b) => a + b, 0);
                 const percentage = total > 0 ? (count / total) * 100 : 0;
                 
                 html += `
-                    <div class="object-item">
-                        <span>${count}</span>
-                        <small>${label}</small>
-                        <div class="progress-bar">
-                            <div class="progress" style="width: ${percentage}%"></div>
+                    <div class="mb-3 fade-in">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small">${label}</span>
+                            <span class="small fw-medium">${count}</span>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-custom" style="width: ${percentage}%"></div>
                         </div>
                     </div>
                 `;
@@ -865,85 +1436,286 @@ class WebRTCYOLOAnnotator:
             container.innerHTML = html;
         }
         
-        // Пауза/возобновление
+        // Toggle pause
         async function togglePause() {
             try {
                 await fetch('/api/toggle_pause', { method: 'POST' });
                 updateStats();
             } catch (error) {
-                console.error('Ошибка переключения паузы:', error);
+                console.error('Pause toggle error:', error);
             }
         }
         
-        // Сохранение сессии
+        // Save session
         async function saveSession() {
             try {
                 const response = await fetch('/api/save_session', { method: 'POST' });
                 const data = await response.json();
-                alert(data.message || 'Сессия сохранена!');
+                showToast(data.message || 'Сессия сохранена!', 'success');
             } catch (error) {
-                alert('Ошибка сохранения сессии');
+                showToast('Ошибка сохранения', 'error');
             }
         }
         
-        // Экспорт аннотаций
+        // Download annotations
         function downloadAnnotations() {
             window.open('/api/download_annotations', '_blank');
         }
         
-        // Скриншот
+        // Export annotations with custom format
+        async function exportAnnotations() {
+            try {
+                const format = document.getElementById('exportFormat').value;
+                const includeImages = document.getElementById('includeImages').checked;
+                const includeMetadata = document.getElementById('includeMetadata').checked;
+                const includeStatistics = document.getElementById('includeStatistics').checked;
+                
+                const response = await fetch('/api/export_annotations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        format: format,
+                        include_images: includeImages,
+                        include_metadata: includeMetadata,
+                        include_statistics: includeStatistics
+                    })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `annotations_${new Date().toISOString().slice(0,10)}.${format}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    showToast('Аннотации экспортированы', 'success');
+                }
+            } catch (error) {
+                showToast('Ошибка экспорта', 'error');
+            }
+        }
+        
+        // Clear annotations
+        async function clearAnnotations() {
+            if (confirm('Вы уверены, что хотите очистить все аннотации?')) {
+                try {
+                    const response = await fetch('/api/clear_annotations', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast('Аннотации очищены', 'success');
+                        updateStats();
+                    }
+                } catch (error) {
+                    showToast('Ошибка очистки', 'error');
+                }
+            }
+        }
+        
+        // Reset statistics
+        async function resetStatistics() {
+            if (confirm('Вы уверены, что хотите сбросить статистику?')) {
+                try {
+                    const response = await fetch('/api/reset_stats', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast('Статистика сброшена', 'success');
+                        updateStats();
+                    }
+                } catch (error) {
+                    showToast('Ошибка сброса', 'error');
+                }
+            }
+        }
+        
+        // Take snapshot
         function takeSnapshot() {
             const canvas = document.getElementById('webcamCanvas');
             const link = document.createElement('a');
             link.download = `snapshot_${Date.now()}.png`;
             link.href = canvas.toDataURL();
             link.click();
+            showToast('Снимок сохранен', 'success');
         }
         
-        // Показать настройки
-        function showSettings() {
-            const panel = document.getElementById('settingsPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-        
-        // Обновление порога уверенности
-        function updateConfidence(value) {
-            settings.confidence = parseFloat(value);
-            document.getElementById('confidenceValue').textContent = value;
-        }
-        
-        // Переключение отображения рамок
-        function toggleBoxes() {
-            settings.showBoxes = document.getElementById('showBoxes').checked;
-        }
-        
-        // Применение настроек
+        // Apply settings
         async function applySettings() {
             try {
+                // Basic settings
+                settings.confidence = parseFloat(document.getElementById('confidenceSlider').value);
+                settings.fps = parseInt(document.getElementById('fpsSlider').value);
+                settings.detectionMode = document.getElementById('detectionMode').value;
+                settings.autoSave = document.getElementById('autoSave').checked;
+                
+                // Visual settings
+                settings.boxColor = document.getElementById('boxColor').value;
+                settings.textColor = document.getElementById('textColor').value;
+                settings.boxThickness = parseInt(document.getElementById('boxThickness').value);
+                settings.fontSize = parseInt(document.getElementById('fontSize').value);
+                settings.showBoxes = document.getElementById('showBoxes').checked;
+                settings.showLabels = document.getElementById('showLabels').checked;
+                settings.showConfidence = document.getElementById('showConfidence').checked;
+                
+                // Advanced settings
+                settings.iouThreshold = parseFloat(document.getElementById('iouSlider').value);
+                settings.motionThreshold = parseInt(document.getElementById('motionSlider').value);
+                settings.saveInterval = parseInt(document.getElementById('saveInterval').value);
+                
+                // Update UI values
+                document.getElementById('confidenceValue').textContent = settings.confidence.toFixed(2);
+                document.getElementById('confidencePercent').textContent = Math.round(settings.confidence * 100) + '%';
+                document.getElementById('fpsValue').textContent = settings.fps;
+                document.getElementById('boxColorText').textContent = settings.boxColor;
+                document.getElementById('textColorText').textContent = settings.textColor;
+                document.getElementById('thicknessValue').textContent = settings.boxThickness;
+                document.getElementById('fontValue').textContent = settings.fontSize;
+                document.getElementById('iouValue').textContent = settings.iouThreshold.toFixed(2);
+                document.getElementById('motionValue').textContent = settings.motionThreshold;
+                
+                // Save to localStorage
+                saveSettings();
+                
+                // Send to server
                 await fetch('/api/update_settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(settings)
                 });
-                alert('Настройки применены!');
-                document.getElementById('settingsPanel').style.display = 'none';
+                
+                // Restart frame processing if camera is running
+                if (cameraStream) {
+                    if (frameInterval) {
+                        clearInterval(frameInterval);
+                    }
+                    startFrameProcessing();
+                }
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+                modal.hide();
+                
+                showToast('Настройки применены', 'success');
+                
             } catch (error) {
-                alert('Ошибка применения настроек');
+                console.error('Settings apply error:', error);
+                showToast('Ошибка применения настроек', 'error');
             }
         }
         
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', () => {
-            // Загрузка камер
-            loadCameras();
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
             
-            // Обновление статистики каждую секунду
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type} border-0`;
+            toast.id = toastId;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body d-flex align-items-center">
+                        ${type === 'success' ? '<i class="bi bi-check-circle-fill me-2"></i>' : ''}
+                        ${type === 'error' ? '<i class="bi bi-exclamation-circle-fill me-2"></i>' : ''}
+                        ${type === 'warning' ? '<i class="bi bi-exclamation-triangle-fill me-2"></i>' : ''}
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 3000
+            });
+            bsToast.show();
+            
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+        
+        // Toggle theme
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update button icon
+            const btn = document.getElementById('themeToggle');
+            btn.innerHTML = newTheme === 'dark' ? 
+                '<i class="bi bi-moon-stars"></i>' : 
+                '<i class="bi bi-sun"></i>';
+            
+            // Update chart colors
+            updateChartColors();
+            
+            // Update glass effect
+            updateGlassEffects();
+        }
+        
+        // Update glass effects based on theme
+        function updateGlassEffects() {
+            const theme = document.documentElement.getAttribute('data-bs-theme');
+            const glassElements = document.querySelectorAll('.glass');
+            
+            glassElements.forEach(el => {
+                if (theme === 'dark') {
+                    el.classList.remove('glass-light');
+                    el.classList.add('glass-dark');
+                } else {
+                    el.classList.remove('glass-dark');
+                    el.classList.add('glass-light');
+                }
+            });
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load saved theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            
+            // Update theme button
+            const themeBtn = document.getElementById('themeToggle');
+            themeBtn.innerHTML = savedTheme === 'dark' ? 
+                '<i class="bi bi-moon-stars"></i>' : 
+                '<i class="bi bi-sun"></i>';
+            
+            // Load settings
+            loadSettings();
+            
+            // Initialize charts
+            initCharts();
+            
+            // Update glass effects
+            updateGlassEffects();
+            
+            // Initialize tooltips
+            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(tooltip => new bootstrap.Tooltip(tooltip));
+            
+            // Update stats every second
             setInterval(updateStats, 1000);
             
-            // Первоначальное обновление
-            updateStats();
+            // Auto-save if enabled
+            if (settings.autoSave) {
+                setInterval(saveSession, settings.saveInterval * 1000);
+            }
             
-            // Очистка при закрытии
+            // Color picker events
+            document.getElementById('boxColor').addEventListener('input', (e) => {
+                document.getElementById('boxColorText').textContent = e.target.value;
+            });
+            
+            document.getElementById('textColor').addEventListener('input', (e) => {
+                document.getElementById('textColorText').textContent = e.target.value;
+            });
+            
+            // Cleanup on page unload
             window.addEventListener('beforeunload', () => {
                 if (cameraStream) {
                     cameraStream.getTracks().forEach(track => track.stop());
@@ -1007,8 +1779,22 @@ class WebRTCYOLOAnnotator:
                 annotations = []
                 if not self.pause_annotation:
                     confidence = client_settings.get('confidence', 0.5)
+                    detection_mode = client_settings.get('detection_mode', 'balanced')
                     
-                    results = self.model(frame, verbose=False, conf=confidence)
+                    # Настройки модели в зависимости от режима
+                    model_args = {
+                        'verbose': False,
+                        'conf': confidence
+                    }
+                    
+                    if detection_mode == 'fast':
+                        model_args['half'] = False
+                        model_args['device'] = 'cpu'
+                    elif detection_mode == 'accurate':
+                        model_args['iou'] = 0.3
+                        model_args['agnostic_nms'] = True
+                    
+                    results = self.model(frame, **model_args)
                     result = results[0]
                     
                     if result.boxes is not None:
@@ -1058,7 +1844,8 @@ class WebRTCYOLOAnnotator:
                                 'saved_index': self.stats['saved_frames'],
                                 'timestamp': datetime.now().isoformat(),
                                 'objects': current_objects,
-                                'client_id': client_id
+                                'client_id': client_id,
+                                'settings': client_settings
                             }
                             
                             self.annotations[f"frame_{self.stats['saved_frames']}"] = frame_annotation
@@ -1101,7 +1888,8 @@ class WebRTCYOLOAnnotator:
                 'recent_detections': recent_detections,
                 'detection_history': self.stats['detection_history'][-20:],
                 'is_paused': self.pause_annotation,
-                'active_clients': len(self.clients)
+                'active_clients': len(self.clients),
+                'settings': self.settings
             }
             return jsonify(stats_data)
         
@@ -1133,6 +1921,69 @@ class WebRTCYOLOAnnotator:
                 )
             return jsonify({'error': 'Нет аннотаций'}), 404
         
+        @app.route('/api/export_annotations', methods=['POST'])
+        def export_annotations():
+            """Экспорт аннотаций в разных форматах"""
+            try:
+                data = request.json
+                format = data.get('format', 'json')
+                include_images = data.get('include_images', True)
+                include_metadata = data.get('include_metadata', True)
+                include_statistics = data.get('include_statistics', True)
+                
+                if not self.annotations:
+                    return jsonify({'error': 'Нет аннотаций'}), 404
+                
+                annotations_data = self.prepare_annotations_data(
+                    include_images=include_images,
+                    include_metadata=include_metadata,
+                    include_statistics=include_statistics
+                )
+                
+                if format == 'json':
+                    content = json.dumps(annotations_data, indent=2, ensure_ascii=False)
+                    mimetype = 'application/json'
+                    ext = 'json'
+                elif format == 'csv':
+                    # Преобразование в CSV
+                    import csv
+                    import io
+                    
+                    output = io.StringIO()
+                    writer = csv.writer(output)
+                    
+                    # Заголовок
+                    writer.writerow(['Frame', 'Object', 'X1', 'Y1', 'X2', 'Y2', 'Confidence', 'Timestamp'])
+                    
+                    # Данные
+                    for frame_id, frame in annotations_data.get('frames', {}).items():
+                        for obj_id, obj in frame.get('objects', {}).items():
+                            writer.writerow([
+                                frame_id,
+                                obj['label'],
+                                obj['x1'],
+                                obj['y1'],
+                                obj['x2'],
+                                obj['y2'],
+                                obj['confidence'],
+                                frame.get('timestamp', '')
+                            ])
+                    
+                    content = output.getvalue()
+                    mimetype = 'text/csv'
+                    ext = 'csv'
+                else:
+                    return jsonify({'error': 'Формат не поддерживается'}), 400
+                
+                return Response(
+                    content,
+                    mimetype=mimetype,
+                    headers={'Content-Disposition': f'attachment; filename=annotations.{ext}'}
+                )
+                
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
         @app.route('/api/save_session', methods=['POST'])
         def save_session():
             """Сохранение сессии"""
@@ -1152,14 +2003,50 @@ class WebRTCYOLOAnnotator:
             """Обновление настроек"""
             try:
                 data = request.json
-                if 'confidence' in data:
-                    # Настройки применяются для каждого клиента отдельно
-                    pass
-                if 'iou_threshold' in data:
-                    self.iou_threshold = float(data['iou_threshold'])
-                return jsonify({'message': 'Настройки обновлены'})
+                if 'iouThreshold' in data:
+                    self.iou_threshold = float(data['iouThreshold'])
+                if 'motionThreshold' in data:
+                    self.position_threshold = int(data['motionThreshold'])
+                if 'saveInterval' in data:
+                    self.settings['save_interval'] = int(data['saveInterval'])
+                
+                # Обновляем другие настройки
+                for key in ['confidence', 'show_boxes', 'show_labels', 'show_conf', 
+                           'box_color', 'text_color', 'box_thickness', 'font_size']:
+                    if key in data:
+                        self.settings[key] = data[key]
+                
+                return jsonify({'message': 'Настройки обновлены', 'settings': self.settings})
             except Exception as e:
                 return jsonify({'error': str(e)}), 400
+        
+        @app.route('/api/clear_annotations', methods=['POST'])
+        def clear_annotations():
+            """Очистка аннотаций"""
+            try:
+                self.annotations.clear()
+                self.prev_objects = None
+                return jsonify({'success': True, 'message': 'Аннотации очищены'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @app.route('/api/reset_stats', methods=['POST'])
+        def reset_stats():
+            """Сброс статистики"""
+            try:
+                self.stats = {
+                    'total_frames': 0,
+                    'saved_frames': 0,
+                    'total_objects': 0,
+                    'fps': 0,
+                    'start_time': time.time(),
+                    'object_counts': {},
+                    'detection_history': [],
+                    'active_clients': len(self.clients)
+                }
+                return jsonify({'success': True, 'message': 'Статистика сброшена'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
         
         logger.info(f"🌐 Сервер запущен: http://localhost:{self.flask_port}")
         logger.info("   Откройте этот адрес в браузере для использования системы")
@@ -1241,18 +2128,33 @@ class WebRTCYOLOAnnotator:
         
         return False
     
-    def prepare_annotations_data(self):
+    def prepare_annotations_data(self, include_images=True, include_metadata=True, include_statistics=True):
         """Подготовка данных для экспорта"""
-        return {
-            'metadata': {
+        data = {}
+        
+        if include_metadata:
+            data['metadata'] = {
                 'project': 'Vision AI Annotator',
                 'export_date': datetime.now().isoformat(),
                 'total_frames': len(self.annotations),
-                'total_objects': self.stats['total_objects']
-            },
-            'statistics': self.stats,
-            'frames': dict(self.annotations)
-        }
+                'total_objects': self.stats['total_objects'],
+                'model': str(self.model),
+                'settings': self.settings
+            }
+        
+        if include_statistics:
+            data['statistics'] = self.stats
+        
+        frames_data = {}
+        for frame_id, frame in self.annotations.items():
+            frame_copy = frame.copy()
+            if not include_images:
+                frame_copy.pop('image_data', None)
+            frames_data[frame_id] = frame_copy
+        
+        data['frames'] = frames_data
+        
+        return data
     
     def run(self):
         """Основной цикл"""
@@ -1288,22 +2190,24 @@ class WebRTCYOLOAnnotator:
 def main():
     """Точка входа"""
     print("\n" + "="*60)
-    print("🚀 VISION AI ANNOTATOR - WebRTC Version")
+    print("🚀 VISION AI ANNOTATOR - Modern Web Interface")
     print("="*60)
     print("Серверная система аннотации объектов")
     print("\n✨ Особенности:")
-    print("  • Использует веб-камеру пользователя через браузер")
-    print("  • Не требует установки камеры на сервере")
-    print("  • Современный интерфейс с адаптивным дизайном")
-    print("  • Экспорт аннотаций в JSON")
-    print("  • Поддержка нескольких клиентов")
+    print("  • Современный стеклянный дизайн (Glassmorphism)")
+    print("  • Плавное переключение тем (темная/светлая)")
+    print("  • Расширенные настройки в модальном окне")
+    print("  • 4 вкладки настроек: Основные, Визуальные, Расширенные, Экспорт")
+    print("  • Настройка цвета рамок и текста")
+    print("  • Режимы детекции: Быстрый, Сбалансированный, Точный")
+    print("  • Экспорт в разных форматах (JSON, CSV, XML)")
     print("\n🎮 Инструкция:")
     print("  1. Откройте браузер (Chrome/Firefox/Edge)")
     print("  2. Перейдите по адресу который появится после запуска")
-    print("  3. Разрешите доступ к веб-камере")
-    print("  4. Выберите камеру из списка")
-    print("  5. Нажмите 'Запустить камеру'")
-    print("  6. Обнаруженные объекты будут отображаться в реальном времени")
+    print("  3. Нажмите 'Старт' для начала работы с камерой")
+    print("  4. Обнаруженные объекты будут отображаться в реальном времени")
+    print("  5. Используйте кнопку настроек (правый нижний угол)")
+    print("  6. Настройте параметры в расширенном модальном окне")
     print("="*60)
     
     try:
