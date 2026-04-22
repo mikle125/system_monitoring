@@ -149,10 +149,10 @@ MIT License — free to use and modify
 
 ## 👤 Author
 
-Mikhail Provkov  
+Mikhail  
 
 GitHub: https://github.com/mikle125  
 
 ---
 
-⭐ If you like this project — give it a sta
+⭐ If you like this project — give it a star
