@@ -1,227 +1,158 @@
-# 🚀 Vision AI Annotator
-
-**Профессиональная система аннотации объектов в реальном времени на базе YOLOv8**
-
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
-![YOLOv8](https://img.shields.io/badge/YOLOv8-ultralytics-red.svg)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.8+-green.svg)
-![Flask](https://img.shields.io/badge/Flask-2.3+-lightgrey.svg)
+# 🚀 Vision AI Annotator  
+### Real-Time Computer Vision System (YOLOv8 + Web Interface)
 
 ---
 
-## 📌 О проекте
+## 📌 Overview
 
-**Vision AI Annotator** — это профессиональный инструмент для автоматической аннотации объектов в реальном времени. Проект ориентирован на разработчиков, исследователей и команды, которым требуется быстро собирать датасеты, анализировать видеопотоки и демонстрировать возможности компьютерного зрения.
+Vision AI Annotator is a real-time computer vision system based on YOLOv8, designed for object detection, video stream analysis, and automated annotation.
 
-В проект входят **два независимых скрипта**, покрывающие как серверные, так и браузерные сценарии работы.
-
----
-
-## 🎯 Возможности
-
-### Общие возможности
-- ⚡ Детекция объектов в реальном времени (YOLOv8)
-- 🖥 Современный веб-интерфейс (Bootstrap 5)
-- 💾 Интеллектуальное автосохранение аннотаций
-- 📊 Живая статистика и графики
-- 📤 Экспорт аннотаций в JSON
-- 📸 Снимки экрана с аннотациями
-- ⏸ Пауза и возобновление обработки
-
-### Скрипт 1 — Локальная камера
-- 🎥 Работа с USB / IP / RTSP-камерами
-- 🔄 Переключение камер в реальном времени
-- 📈 Расширенная статистика (Chart.js)
-- 👁 Предпросмотр всех доступных камер
-- ⚙️ Тонкая настройка параметров детекции
-
-### Скрипт 2 — Камера через браузер
-- 🌐 Камера не требуется на сервере
-- 🔒 Захват видео через WebRTC
-- 📱 Полная поддержка мобильных устройств
-- 👥 Многопользовательский режим
-- 🎨 Адаптивный интерфейс
+The project provides both local and browser-based processing, enabling flexible deployment for developers, researchers, and real-world monitoring scenarios.
 
 ---
 
-## ⚙️ Установка
+## 🧠 Key Features
 
-### 1. Клонирование репозитория
-```bash
-git clone https://github.com/your-username/vision-ai-annotator.git
-cd vision-ai-annotator
-```
-
-### 2. Виртуальное окружение (рекомендуется)
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux / macOS
-venv\\Scripts\\activate     # Windows
-```
-
-### 3. Установка зависимостей
-```bash
-pip install -r requirements.txt
-```
-
-### requirements.txt
-```
-ultralytics>=8.0.0
-opencv-python>=4.8.0
-flask>=2.3.0
-numpy>=1.24.0
-werkzeug>=2.3.0
-```
-
-### 4. Модель YOLO
-- Поместите `best.pt` в корень проекта **или**
-- Используйте стандартную модель `yolov8n.pt` (подгружается автоматически)
+- ⚡ Real-time object detection (YOLOv8)  
+- 🌐 Web-based interface (Flask + Bootstrap)  
+- 📊 Live statistics and analytics  
+- 💾 Automatic annotation saving (JSON)  
+- 📸 Snapshot capture with detections  
+- ⏸ Pause / resume processing  
+- 🔄 Multi-camera support  
+- 📱 Mobile device compatibility (WebRTC mode)  
 
 ---
 
-## ▶️ Запуск
+## 🔬 AI Capabilities
 
-### Скрипт 1 — Локальная камера
-```bash
-python script1.py
-```
-
-**Управление:**
-- `Space` — пауза / продолжить
-- `S` — сохранить аннотации
-- `C` — смена камеры
-- `Q / ESC` — выход
-
-Дополнительно:
-```bash
-python script1.py --port 8080 --output data.json
-```
+- Object detection using custom or pre-trained YOLOv8 models  
+- Real-time video stream processing  
+- Confidence-based filtering  
+- Frame-by-frame annotation tracking  
+- Statistical aggregation (objects, FPS, activity)  
 
 ---
 
-### Скрипт 2 — Камера через браузер
-```bash
-python script2.py
-```
+## 🧩 Architecture
 
-Откройте браузер:
-```
+Client (Browser / Camera)         ↓    Flask Server         ↓  YOLOv8 Detection Engine         ↓   JSON Storage + API
+
+---
+
+## 🧠 Real-World Use Cases
+
+This system can be used for:
+
+- 🏥 Patient monitoring and behavior analysis  
+- 📹 Video surveillance and smart cameras  
+- 📊 Dataset collection for machine learning  
+- 🧪 Computer vision research and prototyping  
+- 🤖 AI demonstration systems  
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone repository
+bash git clone https://github.com/mikle125/system_monitoring.git cd system_monitoring 
+
+### 2. Create virtual environment
+bash python -m venv venv source venv/bin/activate   # Linux / macOS venv\\Scripts\\activate     # Windows 
+
+### 3. Install dependencies
+bash pip install -r requirements.txt 
+
+---
+
+## 🤖 Model Setup
+
+- Place your trained model (best.pt) in the root directory  
+- OR use default YOLOv8 model (auto-download)
+
+---
+
+## ▶️ Running the Project
+
+### 🔹 Script 1 — Local Camera
+bash python script1.py 
+
+Controls:
+- Space — pause / resume  
+- S — save annotations  
+- C — switch camera  
+- Q / ESC — exit  
+
+---
+
+### 🔹 Script 2 — Browser Camera (WebRTC)
+bash python script2.py 
+
+Open in browser:
 http://localhost:3000
-```
-
-Пример:
-```bash
-python script2.py --host 0.0.0.0 --port 5000
-```
 
 ---
 
-## ⚖️ Сравнение режимов
+## 📊 Features Comparison
 
-| Возможность | Скрипт 1 | Скрипт 2 |
-|------------|----------|----------|
-| Камера на сервере | ✅ | ❌ |
+| Feature | Script 1 | Script 2 |
+|--------|--------|--------|
+| Local camera | ✅ | ❌ |
 | WebRTC | ❌ | ✅ |
-| Многопользовательский | ❌ | ✅ |
-| Мобильные устройства | ⚠️ | ✅ |
-| Задержка | Низкая | Средняя |
+| Multi-user | ❌ | ✅ |
+| Mobile support | ⚠️ | ✅ |
+| Latency | Low | Medium |
 
 ---
 
-## 🧾 Формат аннотаций
+## 📁 Project Structure
 
-Аннотации сохраняются в формате JSON:
-```json
-{
-  "metadata": {
-    "project": "Vision AI Annotator",
-    "version": "2.0",
-    "total_frames": 150
-  },
-  "statistics": {
-    "total_objects": 450,
-    "fps": 30.5
-  },
-  "frames": {
-    "frame_1": {
-      "objects": {
-        "person_1": {
-          "label": "person",
-          "confidence": 0.95
-        }
-      }
-    }
-  }
-}
-```
+system_monitoring/ ├── script1.py ├── script2.py ├── requirements.txt ├── README.md ├── best.pt ├── annotations.json └── screenshots/
 
 ---
 
-## 🔌 API
+## 🔌 API Endpoints
 
-**Общие эндпоинты:**
-- `GET /api/stats`
-- `POST /api/toggle_pause`
-- `POST /api/save_session`
-- `GET /api/download_annotations`
-- `POST /api/take_snapshot`
-
-**Только Script 1:**
-- `GET /api/cameras`
-- `POST /api/switch_camera`
-
-**Только Script 2:**
-- `POST /api/process_frame`
+General:
+- GET /api/stats
+- POST /api/toggle_pause
+- POST /api/save_session
+- GET /api/download_annotations
+- POST /api/take_snapshot
 
 ---
 
-## 📁 Структура проекта
-```
-vision-ai-annotator/
-├── script1.py
-├── script2.py
-├── README.md
-├── requirements.txt
-├── best.pt
-├── annotations.json
-├── screenshots/
-└── venv/
-```
+## 📈 Performance
+
+Recommended:
+- CPU: 4+ cores  
+- RAM: 8+ GB  
+- GPU: optional (CUDA supported)  
+- Camera: 720p+  
 
 ---
 
-## 📈 Производительность
+## 🐞 Common Issues
 
-**Рекомендации:**
-- CPU: 4+ ядер
-- RAM: 8+ GB
-- GPU: NVIDIA (CUDA) — опционально
-- Камера: 720p+
-
----
-
-## 🐞 Частые проблемы
-
-- Камера не определяется → проверьте индекс
-- Низкий FPS → уменьшите разрешение
-- YOLO не запускается → проверьте модель
-- Интерфейс недоступен → проверьте порт
+- Camera not detected → check device index  
+- Low FPS → reduce resolution  
+- Model not loading → verify .pt file  
+- UI not доступен → check port  
 
 ---
 
-## 📜 Лицензия
+## 📜 License
 
-**MIT License** — свободное использование и модификация.
-
----
-
-## 👤 Автор
-
-**Ваше имя / организация**
-
-GitHub · Telegram · Email
+MIT License — free to use and modify  
 
 ---
 
-⭐ Если проект оказался полезным — поставьте звезду репозиторию!
+## 👤 Author
 
+Mikhail Provkov  
+
+GitHub: https://github.com/mikle125  
+
+---
+
+⭐ If you like this project — give it a sta
